@@ -49,14 +49,15 @@ class Computer: Player {
         }
         
         if let mine = player.grid[move.x][move.y].mine {
-            lastHitPenaltyCell = mine
+            skipNextTurn = true
+            lastHitMine = mine
         }
         
         if player.gridViewController.fireCannonAtLocation(move) {
             shipHitTrace.append(move)
-            if Settings.ComputerDifficulty == .Advanced && lastHitPenaltyCell == nil { addEducatedMoves() }
+            if Settings.ComputerDifficulty == .Advanced { addEducatedMoves() }
         } else {
-            player.gridViewController.gridView.markImageAtLocation(move, image: Settings.Images.Miss)
+            player.gridViewController.gridView.markMissed(move)
         }
         
         performedMoves.insert(GridLocation(x: move.x, y: move.y))
@@ -66,7 +67,7 @@ class Computer: Player {
                 playerDelegate.playerDidWin(self)
             }
             playerDelegate.playerDidMove(self)
-        }
+        }        
     }
     
     // MARK: Adding New Moves

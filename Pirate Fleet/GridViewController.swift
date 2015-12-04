@@ -46,29 +46,22 @@ class GridViewController {
     func addShip(ship: Ship, playerType: PlayerType = .Human) -> Bool {
         
         guard isShipRequired(ship) else {
-            if let shipSize = ShipSize(rawValue: ship.length) where playerType == .Human {
-                print("ERROR: Cannot add \(ship). You already have enough \(shipSize) ships.")
-            }
+            let shipSize = ShipSize(rawValue: ship.length)!
+            if playerType == .Human { print("ERROR: Cannot add \(ship). You already have enough \(shipSize) ships.") }
             return false
         }
         
         guard !isShipOutOfBounds(ship) else {
-            if playerType == .Human {
-                print("ERROR: Cannot add \(ship). Ship is out of bounds.")
-            }
             return false
         }
         
         guard !isShipOverlapping(ship) else {
-            if playerType == .Human {
-                print("ERROR: Cannot add \(ship). Ship overlaps another ship.")
-            }
             return false
         }
         
         let start = ship.location, end = ShipEndLocation(ship)
-        let metaShip = MetaShip()
         
+        let metaShip = MetaShip()
         for x in start.x...end.x {
             for y in start.y...end.y {
                 
@@ -81,21 +74,25 @@ class GridViewController {
                 // place "front-end" of ship
                 if x == start.x && y == start.y {
                     if ship.isVertical {
-                        gridView.markShipPieceAtLocation(GridLocation(x: x, y: y), orientation: .EndUp, playerType: playerType)                    } else {
-                        gridView.markShipPieceAtLocation(GridLocation(x: x, y: y), orientation: .EndLeft, playerType: playerType)                    }
+                        gridView.markShipPiece(GridLocation(x: x, y: y), orientation: .EndUp, playerType: playerType)
+                    } else {
+                        gridView.markShipPiece(GridLocation(x: x, y: y), orientation: .EndLeft, playerType: playerType)
+                    }
                     continue
                 }
                 
                 // place "back-end" of ship
                 if x == end.x && y == end.y {
                     if ship.isVertical {
-                        gridView.markShipPieceAtLocation(GridLocation(x: x, y: y), orientation: .EndDown, playerType: playerType)                    } else {
-                        gridView.markShipPieceAtLocation(GridLocation(x: x, y: y), orientation: .EndRight, playerType: playerType)                    }
+                        gridView.markShipPiece(GridLocation(x: x, y: y), orientation: .EndDown, playerType: playerType)
+                    } else {
+                        gridView.markShipPiece(GridLocation(x: x, y: y), orientation: .EndRight, playerType: playerType)
+                    }
                     continue
                 }
                 
                 // place middle piece of ship
-                gridView.markShipPieceAtLocation(GridLocation(x: x, y: y), orientation: ((ship.isVertical) ? .BodyVert : .BodyHorz), playerType: playerType)
+                gridView.markShipPiece(GridLocation(x: x, y: y), orientation: ((ship.isVertical) ? .BodyVert : .BodyHorz), playerType: playerType)
             }
         }
         
@@ -110,23 +107,13 @@ class GridViewController {
         
         let x = mine.location.x, y = mine.location.y
 
-        guard !isLocationOutOfBounds(mine.location) else {
-            if playerType == .Human {
-                print("ERROR: Cannot add \(mine). Mine is out of bounds.")
-            }
-            return false
-        }
-        
         guard mineCount < Settings.RequiredMines && !gridView.grid[x][y].containsObject else {
-            if playerType == .Human {
-                print("ERROR: Cannot add \(mine). You already have enough mines.")
-            }
             return false
         }
         
         gridView.grid[x][y].containsObject = true
         gridView.grid[x][y].mine = mine
-        gridView.markImageAtLocation(mine.location, image: Settings.Images.Mine, hidden: ((playerType == .Computer) ? true : false))
+        gridView.markMine(mine, hidden: ((playerType == .Computer) ? true : false))
         mineCount++
         return true
     }
@@ -143,9 +130,9 @@ class GridViewController {
         
         gridView.grid[x][y].metaShip?.cellsHit[location] = true
         if let mine = gridView.grid[x][y].mine {
-            gridView.markImageAtLocation(mine.location, image: Settings.Images.MineHit)
+            gridView.markMineHit(mine)
         } else {
-            gridView.markImageAtLocation(location, image: Settings.Images.Hit)
+            gridView.markHit(location)
         }
         return true
     }
@@ -178,8 +165,8 @@ extension GridViewController {
             return false
         }
         
-        if let ship = gridView.grid[location.x][location.y].metaShip {
-            return ship.sunk
+        if let metaShip = gridView.grid[location.x][location.y].metaShip {
+            return metaShip.sunk
         } else {
             return false
         }
@@ -208,23 +195,15 @@ extension GridViewController {
 // MARK: - Adding Ship Checks
 
 extension GridViewController {
-    
-    private func isLocationOutOfBounds(location: GridLocation) -> Bool {
-        return (location.x >= Settings.DefaultGridSize.width || location.y >= Settings.DefaultGridSize.height || location.x < 0 || location.y < 0)
-    }
-    
+        
     private func isShipOutOfBounds(ship: Ship) -> Bool {
         let start = ship.location, end = ShipEndLocation(ship)
         return (end.x >= Settings.DefaultGridSize.width || end.y >= Settings.DefaultGridSize.height || start.x < 0 || end.x < 0)
     }
     
     private func isShipRequired(ship: Ship) -> Bool {
-        if let shipSize = ShipSize(rawValue: ship.length) {
-            return shipCounts[shipSize] < Settings.RequiredShips[shipSize]
-        } else {
-            print("ERROR: Cannot add \(ship). Ship has an invalid length of \(ship.length).")
-            return false
-        }
+        let shipSize = ShipSize(rawValue: ship.length)!
+        return shipCounts[shipSize] < Settings.RequiredShips[shipSize]
     }
     
     private func isShipOverlapping(ship: Ship) -> Bool {

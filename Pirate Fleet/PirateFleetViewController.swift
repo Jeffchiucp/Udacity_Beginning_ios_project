@@ -1,4 +1,4 @@
-    //
+//
 //  PirateFleetViewController.swift
 //  Pirate Fleet
 //
@@ -26,101 +26,91 @@ class PirateFleetViewController: UIViewController {
     var human: HumanObject!
     var readyToPlay: Bool = false
     var gameOver: Bool = false
-            
+    var viewHasAppeared: Bool = false
+    
     // MARK: Lifecycle
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        self.initializeGame()
+    }
     
     override func viewDidAppear(animated: Bool) {
         super.viewDidAppear(animated)
-        self.initializeGame()
+        
+        if !readyToPlay {
+            endGameWithAlert(Settings.Messages.UnableToStart, withMessage: (human.numberOfMines() == 0) ? Settings.Messages.BaseRequirementsNotMet : Settings.Messages.AdvancedRequirementsNotMet)
+        }
+        
+        viewHasAppeared = true
     }
     
     // MARK: Initialize Game
     
     func initializeGame() {
         
-        // initialize human player first
-        let numberOfMines = setupHuman()
+        // initialize player first, check the number of mines
+        setupPlayer()
+        let numberOfMines = human.numberOfMines()
         
-        // computer must match the number of penalty items added by human
-        setupComputer(numberOfMines: numberOfMines)
-        
-        // determine if the proper amount of ships/mines given
-        let readyState = checkReadyToPlay(numberOfMines: numberOfMines)
+        // computer must match the number of mines
+        setupComputer(numberOfMines)
         
         // are we ready to play?
-        switch(readyState) {
-        case .ReadyToPlay:
-            readyToPlay = true
-            gameOver = false
-        case .ShipsMinesNotReady:
-            readyToPlay = false
-            gameOver = true
-            print(Settings.Messages.ShipsMinesNotReady)
-            createAlertWithTitle(Settings.Messages.UnableToStartTitle, message: readyState.rawValue, completionHandler: nil)
-        case .ShipsNotReady:
-            readyToPlay = false
-            gameOver = true
-            print(Settings.Messages.ShipsNotReady)
-            createAlertWithTitle(Settings.Messages.UnableToStartTitle, message: readyState.rawValue, completionHandler: nil)
-        case .Invalid:
-            readyToPlay = false
-            gameOver = true
+        readyToPlay = (numberOfMines == 0) ? human.readyToPlay(checkMines: false) && computer.readyToPlay(checkMines: false) : human.readyToPlay() && computer.readyToPlay()
+        
+        if !readyToPlay && viewHasAppeared {
+            endGameWithAlert(Settings.Messages.UnableToStart, withMessage: (numberOfMines == 0) ? Settings.Messages.BaseRequirementsNotMet : Settings.Messages.AdvancedRequirementsNotMet)
         }
+        
+        gameOver = false
     }
     
-    func setupHuman() -> Int {
+    func setupPlayer() {
         if human != nil {
             human.reset()
-            human.addPlayerShipsMines()
+            human.addPlayerShipsAndMines()
         } else {
             human = HumanObject(frame: CGRect(x: self.view.frame.size.width / 2 - 120, y: self.view.frame.size.height - 256, width: 240, height: 240))
             human.playerDelegate = self
-            human.addPlayerShipsMines()
+            human.addPlayerShipsAndMines()
             self.view.addSubview(human.gridView)
         }
-        return human.numberOfMines()
     }
     
-    func setupComputer(numberOfMines numberOfMines: Int) {
+    func setupComputer(numberOfMines: Int) {
         if computer != nil {
             computer.reset()
-            computer.addPlayerShipsMines(numberOfMines)
+            computer.addPlayerShipsAndMines(numberOfMines)
         } else {
             computer = Computer(frame: CGRect(x: self.view.frame.size.width / 2 - 180, y: self.view.frame.size.height / 2 - 300, width: 360, height: 360))
             computer.playerDelegate = self
             computer.gridDelegate = self
-            computer.addPlayerShipsMines(numberOfMines)
+            computer.addPlayerShipsAndMines(numberOfMines)
             self.view.addSubview(computer.gridView)
         }
     }
-    
-    // MARK: Check If Ready To Play
 
-    func checkReadyToPlay(numberOfMines numberOfMines: Int) -> ReadyState {
-        switch (numberOfMines) {
-        case 0:
-            return (human.readyToPlay(checkMines: false) && computer.readyToPlay(checkMines: false)) ? .ReadyToPlay : .ShipsNotReady
-        case 1...2:
-            return (human.readyToPlay() && computer.readyToPlay()) ? .ReadyToPlay : .ShipsMinesNotReady
-        default:
-            return .Invalid
-        }
-    }
-    
     // MARK: Alert
     
-    func createAlertWithTitle(title: String, message: String, actionMessage: String? = nil, completionHandler: ((UIAlertAction) -> Void)?) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .Alert)
-        if let actionMessage = actionMessage {
-            let action = UIAlertAction(title: actionMessage, style: .Default, handler: completionHandler)
+    func endGameWithAlert(title: String, withMessage: String, withActionMessage: String? = nil) {
+        gameOver = true
+        let alert = UIAlertController(title: title, message: withMessage, preferredStyle: .Alert)
+        if let withActionMessage = withActionMessage {
+            let action = UIAlertAction(title: withActionMessage, style: .Default) { (action) in
+                self.initializeGame()
+            }
             alert.addAction(action)
         }
         self.presentViewController(alert, animated: true, completion: nil)
     }
     
-    func dismissPenaltyAlert(player: Player) {
-        player.lastHitPenaltyCell = nil
-        nextMove(player)
+    func pauseGameWithMineAlert(explosionText: String, affectedPlayerType: PlayerType) {
+        let alertText = (affectedPlayerType == .Human) ? Settings.Messages.HumanHitMine : Settings.Messages.ComputerHitMine
+        let alert = UIAlertController(title: explosionText + "!", message: alertText, preferredStyle: .Alert)
+        let dismissAction = UIAlertAction(title: Settings.Messages.DismissMineAlert, style: .Default, handler: nil)
+        alert.addAction(dismissAction)
+        self.presentViewController(alert, animated: true, completion: nil)         
     }
 }
 
@@ -140,48 +130,38 @@ extension PirateFleetViewController: GridViewDelegate {
 
 extension PirateFleetViewController: PlayerDelegate {
     
-    // MARK: PlayerDelegate
-    
     func playerDidMove(player: Player) {
-        
-        // we've used a move
-        player.availableMoves.removeLast()
-        
-        // which player was attacked?
-        let attackedPlayer = (player.playerType == .Human) ? computer : human
-        
-        // if any penalties incurred during the move, show alert
-        if let mine = player.lastHitPenaltyCell {            
-            attackedPlayer.availableMoves.append(.NormalMove)
-            
-            let alertMessage = (player.playerType == .Human) ? Settings.Messages.HumanHitMine : Settings.Messages.ComputerHitMine
-            createAlertWithTitle(mine.explosionText, message: alertMessage, actionMessage: Settings.Messages.DismissAction, completionHandler: { (action) in
-                self.dismissPenaltyAlert(player)
-            })
-        } else {
-            nextMove(player)
-        }        
+        switch player.playerType {
+        case .Human:
+            // human finished moving, should we skip the computer?
+            if computer.skipNextTurn {
+                computer.skipNextTurn = false
+            } else {
+                computer.attack(human)
+                
+                // did human hit a mine?
+                if let mine = human.lastHitMine where human.skipNextTurn {
+                    // yes, then invokes playerDidMove again to "skip"
+                    pauseGameWithMineAlert(mine.explosionText, affectedPlayerType: player.playerType)
+                    human.skipTurn()
+                }
+            }            
+        case .Computer:
+            if let mine = computer.lastHitMine where computer.skipNextTurn {
+                pauseGameWithMineAlert(mine.explosionText, affectedPlayerType: player.playerType)
+            }
+        }
     }
-    
+
     func playerDidWin(player: Player) {
-        
         if gameOver == false {
             switch player.playerType {
-                
-            // human won!
             case .Human:
-                createAlertWithTitle(Settings.Messages.GameOverTitle, message: Settings.Messages.GameOverWin, actionMessage: Settings.Messages.ResetAction, completionHandler: { (action) in
-                    self.initializeGame()
-                })
-                
-            // computer won!
+                endGameWithAlert(Settings.Messages.GameOver, withMessage: Settings.Messages.Win, withActionMessage: Settings.Messages.Reset)
             case .Computer:
-                createAlertWithTitle(Settings.Messages.GameOverTitle, message: Settings.Messages.GameOverLose, actionMessage: Settings.Messages.ResetAction, completionHandler: { (action) in
-                    self.initializeGame()
-                })
+                endGameWithAlert(Settings.Messages.GameOver, withMessage: Settings.Messages.Lose, withActionMessage: Settings.Messages.Reset)
             }
             
-            // print final score
             print(human.calculateScore(computer))
         }
     }
@@ -189,37 +169,6 @@ extension PirateFleetViewController: PlayerDelegate {
     func playerDidSinkAtLocation(player: Player, location: GridLocation) {
         if player.playerType == .Human {
             computer.revealShipAtLocation(location)
-        }
-    }
-    
-    // MARK: Take Next Move
-    
-    func nextMove(player: Player) {
-        (player.playerType == .Human) ? self.nextHumanMove() : self.nextComputerMove()
-    }
-    
-    func nextHumanMove() {
-        if human.availableMoves.isEmpty {
-            computer.availableMoves.append(.NormalMove)
-            computer.attack(human)
-        } else {
-            let nextMove: MoveType = human.availableMoves.last!
-            if nextMove == .GuaranteedHit {
-                human.attackPlayerWithGuaranteedHit(computer)
-            }
-        }
-    }
-    
-    func nextComputerMove() {
-        if computer.availableMoves.isEmpty {
-            human.availableMoves.append(.NormalMove)
-        } else {
-            let nextMove: MoveType = computer.availableMoves.last!
-            if nextMove == .GuaranteedHit {
-                computer.attackPlayerWithGuaranteedHit(human)
-            } else {
-                computer.attack(human)
-            }
         }
     }
 }

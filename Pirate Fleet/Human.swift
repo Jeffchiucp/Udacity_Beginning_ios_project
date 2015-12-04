@@ -29,7 +29,15 @@ class HumanObject: Player, Human {
     override init(frame: CGRect) {
         super.init(frame: frame)
         self.playerType = .Human
-        self.availableMoves.append(.NormalMove)
+    }
+    
+    // MARK: Skip Turn
+    
+    func skipTurn() {
+        skipNextTurn = false
+        if let playerDelegate = playerDelegate {
+            playerDelegate.playerDidMove(self)
+        }
     }
     
     // MARK: Modify Grid
@@ -42,7 +50,7 @@ class HumanObject: Player, Human {
         gridViewController.addMine(mine)
     }
     
-    override func addPlayerShipsMines(numberOfMines: Int = 0) {
+    override func addPlayerShipsAndMines(numberOfMines: Int = 0) {
         controlCenter.addShipsAndMines(self)
     }
     
@@ -50,7 +58,7 @@ class HumanObject: Player, Human {
     
     func calculateScore(computer: Computer) -> String {
 
-        let gameStats = GameStats(numberOfHitsOnEnemy: numberOfHits, numberOfMissesByHuman: numberOfMisses, enemyShipsRemaining: 5 - computer.gridViewController.numberSunk(), humanShipsSunk: gridViewController.numberSunk(), sinkBonus: 100, shipBonus: 100, guessPenalty: 10)
+        let gameStats = GameStats(numberOfHitsOnEnemy: numberOfHits, numberOfMissesByHuman: numberOfMisses, enemyShipsRemaining: 5 - computer.gridViewController.numberSunk(), humanShipsSunk: gridViewController.numberSunk(), sinkBonus: -100, shipBonus: 100, guessPenalty: 10)
         
         return "Final Score: \(controlCenter.calculateFinalScore(gameStats))"
     }
