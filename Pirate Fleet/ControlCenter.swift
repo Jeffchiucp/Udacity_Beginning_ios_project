@@ -58,7 +58,7 @@ class ControlCenter {
         let humanShipsRemaining = totalShipsPerSide - gameStats.humanShipsSunk
         let numberOfGuesses = gameStats.numberOfHitsOnEnemy + gameStats.numberOfHitsOnEnemy
         
-        finalScore = (enemyShipsSunk * gameStats.sinkBonus) + (humanShipsRemaining * gameStats.shipBonus) + (numberOfGuesses * gameStats.guessPenalty)
+        finalScore = (enemyShipsSunk * gameStats.sinkBonus) + (humanShipsRemaining * gameStats.shipBonus) - (numberOfGuesses * gameStats.guessPenalty)
         
         print("the value of final score is (finalScore)")
         
